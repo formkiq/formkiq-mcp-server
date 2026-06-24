@@ -15,12 +15,77 @@ The OpenAPI source defaults to:
 https://raw.githubusercontent.com/formkiq/formkiq-core/refs/heads/master/docs/openapi/openapi-jwt.yaml
 ```
 
+## Quick Start
+
+The most common setup is to let your MCP client start this server with `pipx` from GitHub.
+
+Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name "<formkiq-stack-name>" \
+  --query "Stacks[0].Outputs[?OutputKey=='HttpApiUrl'].OutputValue | [0]" \
+  --output text
+```
+
+Replace the example endpoint and JWT values in the client config snippets below.
+
+### Codex Setup
+
+Add this to `~/.codex/config.toml` or to a trusted project's `.codex/config.toml`:
+
+```toml
+[mcp_servers.formkiq]
+command = "pipx"
+args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git", "formkiq-mcp-server"]
+env = { "MCP_TRANSPORT" = "stdio", "FORMKIQ_API_ENDPOINT_URL" = "https://abc123.execute-api.us-east-1.amazonaws.com", "FORMKIQ_JWT" = "eyJ..." }
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+enabled = true
+```
+
+Start a new Codex session and check:
+
+```text
+/mcp
+```
+
+### Claude Code Setup
+
+Add the server from the CLI:
+
+```bash
+claude mcp add --transport stdio formkiq \
+  --env FORMKIQ_API_ENDPOINT_URL=https://abc123.execute-api.us-east-1.amazonaws.com \
+  --env FORMKIQ_JWT=eyJ... \
+  --env MCP_TRANSPORT=stdio \
+  -- pipx run --spec git+https://github.com/formkiq/formkiq-mcp-server.git formkiq-mcp-server
+```
+
+Then check:
+
+```bash
+claude mcp list
+```
+
+Inside Claude Code, use:
+
+```text
+/mcp
+```
+
 ## Requirements
 
 - Python 3.11+
-- `uv`
+- `pipx` for GitHub-backed MCP client setup, or `uv` for local development
 - a deployed FormKiQ API endpoint URL from the FormKiQ CloudFormation outputs
 - a FormKiQ JWT for API calls
+
+Install `pipx` if needed:
+
+```bash
+brew install pipx
+```
 
 Install `uv` if needed:
 
@@ -221,36 +286,9 @@ For request bodies:
 }
 ```
 
-## Codex Setup
+## Local Codex Development Setup
 
-Codex supports MCP servers in `config.toml`.
-
-For a GitHub-backed setup similar to common `pipx` MCP servers, add this to `~/.codex/config.toml` or to a trusted project's `.codex/config.toml`:
-
-```toml
-[mcp_servers.formkiq]
-command = "pipx"
-args = [
-  "run",
-  "--spec",
-  "git+https://github.com/formkiq/formkiq-mcp-server.git",
-  "formkiq-mcp-server",
-]
-env = { "MCP_TRANSPORT" = "stdio", "FORMKIQ_API_ENDPOINT_URL" = "https://abc123.execute-api.us-east-1.amazonaws.com", "FORMKIQ_JWT" = "eyJ..." }
-startup_timeout_sec = 30
-tool_timeout_sec = 60
-enabled = true
-enabled_tools = [
-  "list_formkiq_operations",
-  "call_formkiq_operation",
-  "get_version",
-  "get_documents",
-  "get_document",
-  "search_documents",
-]
-```
-
-For local development from a checkout, use `uv` instead:
+For local development from a checkout, use `uv` in `~/.codex/config.toml` or in a trusted project's `.codex/config.toml`:
 
 ```toml
 [mcp_servers.formkiq]
@@ -286,19 +324,9 @@ codex mcp list
 
 Codex MCP configuration reference: https://developers.openai.com/codex/mcp
 
-## Claude Code Setup
+## Claude Code Project Setup
 
-Claude Code can add a local stdio server from the CLI:
-
-```bash
-claude mcp add --transport stdio formkiq \
-  --env FORMKIQ_API_ENDPOINT_URL=https://abc123.execute-api.us-east-1.amazonaws.com \
-  --env FORMKIQ_JWT=eyJ... \
-  --env MCP_TRANSPORT=stdio \
-  -- uv --directory /Users/you/Documents/github/formkiq-mcp-server run python server.py
-```
-
-For a project-shared setup, add a `.mcp.json` file to your project:
+For a project-shared Claude Code setup from a local checkout, add a `.mcp.json` file to your project:
 
 ```json
 {
