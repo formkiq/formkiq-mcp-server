@@ -17,7 +17,7 @@ Each MCP server release bundles an OpenAPI snapshot for offline startup. Its ups
 
 For release installations, let your MCP client start this server with `pipx` from a GitHub release tag, using `@vMAJOR.MINOR.PATCH`.
 
-The examples below target the planned first release, `v0.1.0`, matching the package version in `pyproject.toml`. Until that tag is published, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. For later versions, select a published tag from [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
+The examples below use release `v0.1.0`, matching the package version in `pyproject.toml`. Select other published versions from [Releases](https://github.com/formkiq/formkiq-mcp-server/releases). To develop locally, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions.
 
 Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
 
@@ -101,7 +101,7 @@ cd formkiq-mcp-server
 uv sync --locked
 ```
 
-After the release tag is published, you can also run directly from GitHub with `pipx`:
+You can also run directly from GitHub with `pipx`:
 
 ```bash
 pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.1.0" formkiq-mcp-server
