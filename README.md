@@ -8,16 +8,16 @@ This server:
 - parses operation metadata from the OpenAPI document
 - proxies a curated set of FormKiQ operations as MCP tools
 - forwards calls to a deployed FormKiQ API using a JWT
+- defaults to read-only access, with separate opt-in write and purge tools
+- validates arguments and streams responses within a configurable size limit
 
-The OpenAPI source defaults to:
-
-```text
-https://raw.githubusercontent.com/formkiq/formkiq-core/refs/heads/master/docs/openapi/openapi-jwt.yaml
-```
+Each MCP server release bundles an OpenAPI snapshot for offline startup. Its upstream source and checksum are recorded in [provenance.json](formkiq_mcp/data/provenance.json). The MCP server version and the upstream FormKiQ API version are independent.
 
 ## Quick Start
 
-The most common setup is to let your MCP client start this server with `pipx` from GitHub.
+For release installations, let your MCP client start this server with `pipx` from a GitHub release tag, using `@vMAJOR.MINOR.PATCH`.
+
+The examples below use release `v0.1.0`, matching the package version in `pyproject.toml`. Select other published versions from [Releases](https://github.com/formkiq/formkiq-mcp-server/releases). To develop locally, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions.
 
 Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
 
@@ -28,7 +28,7 @@ aws cloudformation describe-stacks \
   --output text
 ```
 
-Replace the example endpoint and JWT values in the client config snippets below.
+Replace the example endpoint and JWT values below. Keep the same release tag across client configurations. The tag selects the application version; the checked-in `uv.lock` pins dependencies for checkout-based installations.
 
 ### Codex Setup
 
@@ -37,7 +37,7 @@ Add this to `~/.codex/config.toml` or to a trusted project's `.codex/config.toml
 ```toml
 [mcp_servers.formkiq]
 command = "pipx"
-args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git", "formkiq-mcp-server"]
+args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.1.0", "formkiq-mcp-server"]
 env = { "MCP_TRANSPORT" = "stdio", "FORMKIQ_API_ENDPOINT_URL" = "https://abc123.execute-api.us-east-1.amazonaws.com", "FORMKIQ_JWT" = "eyJ..." }
 startup_timeout_sec = 30
 tool_timeout_sec = 60
@@ -59,7 +59,7 @@ claude mcp add --transport stdio formkiq \
   --env FORMKIQ_API_ENDPOINT_URL=https://abc123.execute-api.us-east-1.amazonaws.com \
   --env FORMKIQ_JWT=eyJ... \
   --env MCP_TRANSPORT=stdio \
-  -- pipx run --spec git+https://github.com/formkiq/formkiq-mcp-server.git formkiq-mcp-server
+  -- pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.1.0" formkiq-mcp-server
 ```
 
 Then check:
@@ -98,13 +98,13 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 git clone https://github.com/formkiq/formkiq-mcp-server.git
 cd formkiq-mcp-server
-uv sync
+uv sync --locked
 ```
 
 You can also run directly from GitHub with `pipx`:
 
 ```bash
-pipx run --spec git+https://github.com/formkiq/formkiq-mcp-server.git formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.1.0" formkiq-mcp-server
 ```
 
 ## Configure
@@ -144,17 +144,17 @@ export FORMKIQ_API_ENDPOINT_URL="$(aws cloudformation describe-stacks \
   --output text)"
 ```
 
-For IAM or API key endpoint experiments, change the output key to `IamApiUrl` or `KeyApiUrl` and point `FORMKIQ_OPENAPI_URL` or `FORMKIQ_OPENAPI_FILE` at the matching OpenAPI spec.
+Changing the endpoint or OpenAPI document alone does not enable IAM signing or API-key authentication. This implementation supports JWT authentication only.
 
 `FORMKIQ_API_BASE_URL` is still accepted as a deprecated alias for compatibility, but new configs should use `FORMKIQ_API_ENDPOINT_URL`.
 
-Optional: use a local OpenAPI file instead of downloading from GitHub:
+Optional: override the bundled OpenAPI document with a compatible local file:
 
 ```bash
 export FORMKIQ_OPENAPI_FILE="/path/to/formkiq-core/docs/openapi/openapi-jwt.yaml"
 ```
 
-Optional: use a different OpenAPI URL:
+Optional: override the bundled document with an HTTPS URL (pin the URL to an immutable version). Set only one OpenAPI override:
 
 ```bash
 export FORMKIQ_OPENAPI_URL="https://example.com/openapi-jwt.yaml"
@@ -163,13 +163,13 @@ export FORMKIQ_OPENAPI_URL="https://example.com/openapi-jwt.yaml"
 ## Run Locally Over HTTP
 
 ```bash
-uv run python server.py
+uv run --locked python server.py
 ```
 
 Or, after installing/running through `pipx`:
 
 ```bash
-pipx run --spec git+https://github.com/formkiq/formkiq-mcp-server.git formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.1.0" formkiq-mcp-server
 ```
 
 By default, the Python MCP SDK serves Streamable HTTP at:
@@ -185,7 +185,7 @@ Use this mode for MCP clients that connect to an already-running HTTP server.
 Most local AI clients start MCP servers as child processes over stdio. This server supports that mode with:
 
 ```bash
-MCP_TRANSPORT=stdio uv run python server.py
+MCP_TRANSPORT=stdio uv run --locked python server.py
 ```
 
 You normally do not run that command manually. Instead, put it in your MCP client configuration.
@@ -195,13 +195,14 @@ You normally do not run that command manually. Instead, put it in your MCP clien
 This server exposes a curated allowlist:
 
 - `list_formkiq_operations`
-- `call_formkiq_operation`
+- `call_formkiq_operation` (read/search only)
+- `describe_operation` (parameters, schemas, and examples)
 - `get_version`
 - `get_documents`
 - `get_document`
 - `search_documents`
 
-Use `call_formkiq_operation` for the full allowlist below. The convenience tools intentionally cover only common read/search workflows.
+Use `list_formkiq_operations` to discover what is enabled for the current caller, then `describe_operation` before constructing arguments. The table below is the supported catalog; write and purge operations are disabled by default. The convenience tools cover common read/search workflows.
 
 ### Supported FormKiQ API Endpoints
 
@@ -248,11 +249,13 @@ Use `call_formkiq_operation` for the full allowlist below. The convenience tools
 | `POST` | `/searchFulltext` | `SearchFulltext` |
 | `GET` | `/version` | `GetVersion` |
 
-You can expand `ALLOWED_OPERATION_IDS` in `server.py`. Be careful when exposing destructive or administrative operations until you have user confirmation, audit logging, and authorization checks in place.
+The curated catalog is defined by `ALLOWED_OPERATION_IDS` in `formkiq_mcp/openapi.py`. Startup rejects specs with missing catalog operations, duplicate operation IDs, or unresolved/external references. Operation-level parameters override path-level parameters. Custom documents must use OpenAPI 3.0 and JSON request bodies.
 
 ## Generic Tool Shape
 
-`call_formkiq_operation` accepts nested arguments:
+`call_formkiq_operation` accepts nested arguments or unambiguous top-level parameter names. Unknown/conflicting arguments, missing required values, invalid types, and path dot segments are rejected before sending requests. Request bodies follow the schema returned by `describe_operation`; unknown body fields follow that schema’s `additionalProperties` rule.
+
+Nested example:
 
 ```json
 {
@@ -293,7 +296,7 @@ For local development from a checkout, use `uv` in `~/.codex/config.toml` or in 
 ```toml
 [mcp_servers.formkiq]
 command = "uv"
-args = ["run", "python", "server.py"]
+args = ["run", "--locked", "python", "server.py"]
 cwd = "/Users/you/Documents/github/formkiq-mcp-server"
 env_vars = ["FORMKIQ_API_ENDPOINT_URL", "FORMKIQ_JWT"]
 startup_timeout_sec = 30
@@ -334,7 +337,7 @@ For a project-shared Claude Code setup from a local checkout, add a `.mcp.json` 
     "formkiq": {
       "type": "stdio",
       "command": "uv",
-      "args": ["--directory", "/Users/you/Documents/github/formkiq-mcp-server", "run", "python", "server.py"],
+      "args": ["--directory", "/Users/you/Documents/github/formkiq-mcp-server", "run", "--locked", "python", "server.py"],
       "env": {
         "MCP_TRANSPORT": "stdio",
         "FORMKIQ_API_ENDPOINT_URL": "https://abc123.execute-api.us-east-1.amazonaws.com",
@@ -375,7 +378,7 @@ Example:
   "mcpServers": {
     "formkiq": {
       "command": "uv",
-      "args": ["--directory", "/Users/you/Documents/github/formkiq-mcp-server", "run", "python", "server.py"],
+      "args": ["--directory", "/Users/you/Documents/github/formkiq-mcp-server", "run", "--locked", "python", "server.py"],
       "env": {
         "MCP_TRANSPORT": "stdio",
         "FORMKIQ_API_ENDPOINT_URL": "https://abc123.execute-api.us-east-1.amazonaws.com",
@@ -398,7 +401,7 @@ Claude Desktop local MCP setup docs: https://modelcontextprotocol.io/docs/develo
 Run the HTTP server:
 
 ```bash
-uv run python server.py
+uv run --locked python server.py
 ```
 
 Then start the inspector:
@@ -413,22 +416,96 @@ Connect to:
 http://localhost:8000/mcp
 ```
 
-## Security Notes
+## Write and Purge Access
 
-- The OpenAPI spec declares `http://localhost` as its server URL, so runtime calls use `FORMKIQ_API_ENDPOINT_URL`, which should be the FormKiQ CloudFormation `HttpApiUrl`, `IamApiUrl`, or `KeyApiUrl` output that matches your authentication mode.
-- Do not commit real JWTs to config files.
-- Prefer environment variables or your client application's secret management.
-- Be careful when exposing write, delete, purge, user/group, API key, or system configuration operations as tools.
-- For hosted deployments, authenticate the MCP caller and forward or exchange the caller's token instead of using a shared server token.
+Read-only access is the default. To enable the separate `call_formkiq_write_operation` tool:
 
-## AWS Deployment Note
-
-For a hosted serverless deployment, this maps cleanly to:
-
-```text
-API Gateway HTTP API or Lambda Function URL
-  -> Lambda container running this server
-  -> FormKiQ API
+```bash
+export FORMKIQ_ENABLE_WRITES=true
 ```
 
-For long-running remote MCP usage, consider Streamable HTTP behind API Gateway, Lambda Function URLs, App Runner, or ECS Fargate depending on your streaming/session requirements.
+The read tool continues to reject mutations. Permanent purge is enabled separately and exposes `purge_document`:
+
+```bash
+export FORMKIQ_ENABLE_WRITES=true
+export FORMKIQ_ENABLE_PURGE=true
+```
+
+Restart the server after changing configuration. MCP clients should request user approval for destructive actions; tool annotations identify reads and mutations. Server-side flags and caller policies enforce access independently of client annotations.
+
+Migration: existing callers that used `call_formkiq_operation` for mutations must enable writes and switch to `call_formkiq_write_operation`. Purge callers must enable both flags and use `purge_document`.
+
+## Response Handling and Limits
+
+Responses retain `operationId`, `method`, `statusCode`, `ok`, and `body`. Full request URLs are omitted to avoid exposing share keys. Upstream API failures produce MCP `isError: true`, preserving the HTTP status, bounded response body, and `Retry-After` when present. Invalid JSON, unsupported binary content, transport failures, and timeouts also produce tool errors. Writes are never retried automatically.
+
+`FORMKIQ_MAX_RESPONSE_BYTES` defaults to `65536` (64 KiB), with a supported range of 1 KiB–10 MiB. The proxy stops reading oversized decoded responses, closes the stream, and returns an explicit error. It also limits serialized tool payloads and operation descriptions. Request fewer results, follow pagination tokens, or use `GetDocumentUrl` for large content. The explicitly requested full OpenAPI resource is exempt from this limit; use `describe_operation` for focused schemas.
+
+## HTTP Caller Authentication
+
+Local HTTP binds to `127.0.0.1:8000` by default. `FORMKIQ_MCP_HOST` and `FORMKIQ_MCP_PORT` configure the listener. Non-loopback HTTP refuses to start without `FORMKIQ_MCP_AUTH_FILE`. A reverse proxy that exposes a loopback listener publicly must also use caller authentication.
+
+HTTP authentication uses preconfigured MCP bearer tokens. Configure the token manually in the MCP client; this mode does not provide an OAuth authorization server or automatic OAuth login. MCP tokens are distinct from downstream FormKiQ JWTs and are never forwarded to FormKiQ.
+
+Generate a high-entropy token and its SHA-256 hash:
+
+```bash
+python3 - <<'PYTOKEN'
+import hashlib
+import secrets
+token = secrets.token_urlsafe(32)
+print("MCP client token:", token)
+print("token_sha256:", hashlib.sha256(token.encode()).hexdigest())
+PYTOKEN
+```
+
+Store only the hash in a private policy file:
+
+```json
+{
+  "clients": [
+    {
+      "id": "analyst",
+      "token_sha256": "<64-character-lowercase-sha256>",
+      "jwt_env": "FORMKIQ_ANALYST_JWT",
+      "allowed_operations": ["GetDocuments", "GetDocument", "DocumentSearch"],
+      "allowed_sites": ["tenant-a"]
+    }
+  ]
+}
+```
+
+```bash
+export FORMKIQ_MCP_AUTH_FILE="/private/path/formkiq-callers.json"
+export FORMKIQ_ANALYST_JWT="<FormKiQ JWT scoped to this caller>"
+export FORMKIQ_MCP_HOST="0.0.0.0"
+uv run --locked python server.py
+```
+
+Each request requires `Authorization: Bearer <MCP client token>`. Policies restrict operation IDs and site IDs, and each caller maps to its own downstream JWT variable. Missing `siteId` means `default`, which must be explicitly authorized; a tenant-specific caller should supply its site. Global write/purge flags remain required even if a caller policy lists those operations. Policy files load at startup; restart to rotate tokens or policies. Use least-privilege downstream JWTs and replace them when they expire.
+
+HTTP uses stateless MCP requests so caller identity remains attached to each request. A single async HTTP client is reused for the application lifespan. Requests have a 10-second connect timeout and 30-second network-operation timeout.
+
+## Security and Hosting
+
+- Use the CloudFormation `HttpApiUrl` endpoint for JWT authentication. IAM signing and API-key authentication are not implemented.
+- FormKiQ endpoints require HTTPS, except loopback HTTP for local development.
+- Do not commit JWTs, MCP bearer tokens, or private caller-policy files. Prefer environment variables and secret management.
+- Operation audit records go to stderr and include caller ID, operation ID, outcome, status, and duration. Bodies, document IDs, query parameters, and credentials are excluded.
+- Place hosted HTTP behind TLS and configure caller authentication, authorization, and infrastructure rate limits. Use a long-running ASGI-compatible host such as ECS or App Runner. Lambda/API Gateway deployments require an appropriate ASGI adapter and timeout configuration.
+
+## Development and Verification
+
+```bash
+uv sync --locked
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked python -m unittest discover -v
+uv build
+```
+
+Tests cover route protection, referenced parameters and overrides, schema validation, read/write/purge boundaries, response limits, MCP errors, concurrency, caller isolation, HTTP transport, and stdio startup. Backend requests are mocked. CI runs the locked environment on Python 3.11 and 3.14, then installs the wheel in an isolated environment and checks the console entry point and bundled resource.
+
+When updating the bundled spec, use an immutable upstream commit, update `formkiq_mcp/data/provenance.json` with the source and SHA-256, and run the suite. Keep the upstream Apache-2.0 license attribution in that file.
+
+Release tags use `vMAJOR.MINOR.PATCH` and match `[project].version` in `pyproject.toml` (for example, package version `0.1.0` uses tag `v0.1.0`). Before publishing a release, update the package version, regenerate `uv.lock`, update the installation examples to the matching tag, and run the verification steps above. Keep published release tags fixed to their original commits.

@@ -1,0 +1,32 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.8"
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked python -m unittest discover -v
+      - run: uv build
+      - name: Verify installed wheel outside the checkout
+        shell: bash
+        run: |
+          package_env="$RUNNER_TEMP/formkiq-wheel-env"
+          uv venv "$package_env" --python "${{ matrix.python }}"
+          uv pip install --python "$package_env/bin/python" dist/*.whl
+          PATH="$package_env/bin:$PATH" "$package_env/bin/python" tests/smoke_installed.py
