@@ -13,58 +13,12 @@ import httpx
 import yaml
 from jsonschema import Draft4Validator, FormatChecker
 
+from .operations import ALLOWED_OPERATION_IDS, READ_OPERATION_IDS, WRITE_OPERATION_IDS  # noqa: F401
+
 BUNDLED_SPEC_URL = (
     "https://raw.githubusercontent.com/formkiq/formkiq-core/"
     "2d72a01c04f153e4ccadf72164bd248b270d774e/docs/openapi/openapi-jwt.yaml"
 )
-ALLOWED_OPERATION_IDS = frozenset(
-    {
-        "AddAttribute",
-        "AddDocumentActions",
-        "AddDocumentAttributes",
-        "AddDocumentTags",
-        "AddDocumentUpload",
-        "DeleteAttribute",
-        "DeleteDocument",
-        "DeleteDocumentAttribute",
-        "DeleteDocumentAttributeAndValue",
-        "DeleteDocumentTag",
-        "DeleteDocumentTagAndValue",
-        "DeleteDocumentVersion",
-        "DocumentSearch",
-        "GetAttribute",
-        "GetAttributeAllowedValues",
-        "GetAttributes",
-        "GetDocument",
-        "GetDocumentActions",
-        "GetDocumentArtifacts",
-        "GetDocumentAttribute",
-        "GetDocumentAttributes",
-        "GetDocumentContent",
-        "GetDocuments",
-        "GetDocumentTag",
-        "GetDocumentTags",
-        "GetDocumentUrl",
-        "GetDocumentVersions",
-        "GetResourceActivities",
-        "GetVersion",
-        "PurgeDocument",
-        "SearchFulltext",
-        "SetDocumentAttributeValue",
-        "SetDocumentAttributes",
-        "SetDocumentRestore",
-        "SetDocumentTag",
-        "SetDocumentTags",
-        "SetDocumentVersion",
-        "UpdateAttribute",
-        "UpdateDocument",
-        "UpdateDocumentTags",
-    }
-)
-READ_OPERATION_IDS = frozenset(
-    name for name in ALLOWED_OPERATION_IDS if name.startswith("Get") or name in {"DocumentSearch", "SearchFulltext"}
-)
-WRITE_OPERATION_IDS = ALLOWED_OPERATION_IDS - READ_OPERATION_IDS - {"PurgeDocument"}
 
 
 class OpenApiProxyError(ValueError):
@@ -147,6 +101,8 @@ class OpenApiCatalog:
                     "description": operation.get("description", ""),
                     "parameters": list(parameters.values()),
                     "requestBody": self.resolve(operation["requestBody"]) if "requestBody" in operation else None,
+                    "requiredPermission": operation.get("x-formkiq-required-permission"),
+                    "responseStatusCodes": [str(code) for code in operation.get("responses", {})],
                 }
         missing = allowed_ids - self.operations.keys()
         if missing:

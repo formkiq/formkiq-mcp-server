@@ -173,6 +173,8 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.server = await self.make_server()
 
     async def make_server(self, **settings):
+        settings.setdefault("auto_discover", False)
+
         def factory(**kwargs):
             client = httpx.AsyncClient(transport=httpx.MockTransport(self.handler), **kwargs)
             self.clients.append(client)
@@ -205,10 +207,14 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_default_tools_and_operations_are_read_only(self):
         tools = await self.server.list_tools()
-        self.assertEqual(len(tools), 7)
+        self.assertEqual(len(tools), 29)
         self.assertTrue(all(tool.annotations.readOnlyHint for tool in tools))
         result = await call(self.server, "list_formkiq_operations")
-        self.assertEqual({op["operationId"] for op in result.structuredContent["result"]}, READ_OPERATION_IDS)
+        enabled = {op["operationId"] for op in result.structuredContent["result"]}
+        self.assertEqual(len(enabled), 25)
+        self.assertTrue({"GetSites", "GetPermissionCatalog", "GetSitesSchema", "IndexSearch"} <= enabled)
+        self.assertFalse({"SearchFulltext", "GetResourceActivities", "GetDocumentIdUpload", "GetWorkflow"} & enabled)
+        self.assertTrue(enabled <= READ_OPERATION_IDS)
         for operation_id in ("DeleteDocument", "PurgeDocument"):
             result = await call(self.server, "call_formkiq_operation", {"operation_id": operation_id})
             self.assertTrue(result.isError)
@@ -230,7 +236,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_write_and_purge_require_their_dedicated_tools(self):
         server = await self.make_server(enable_writes=True, enable_purge=True)
-        args = {"operation_id": "DeleteDocument", "args": {"documentId": "doc-123"}}
+        args = {"operation_id": "DeleteDocument", "args": {"documentId": "doc-123", "deleteType": "SOFT_DELETE"}}
         self.assertTrue((await call(server, "call_formkiq_operation", args)).isError)
         self.assertFalse((await call(server, "call_formkiq_write_operation", args)).isError)
         self.assertEqual(self.requests[-1].method, "DELETE")
@@ -476,17 +482,20 @@ class HttpTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StdioTests(unittest.IsolatedAsyncioTestCase):
+    @patch.dict(os.environ, {"FORMKIQ_ENABLE_WRITES": "true", "FORMKIQ_MCP_AUTH_FILE": "/not-used"})
     async def test_stdio_initialization_tools_and_bundled_resource(self):
         import sys
 
-        env = {name: "" for name in os.environ if name.startswith(("FORMKIQ_", "FASTMCP_"))}
-        env["MCP_TRANSPORT"] = "stdio"
+        env = {"MCP_TRANSPORT": "stdio", "PYTHON_DOTENV_DISABLED": "1"}
         params = StdioServerParameters(command=sys.executable, args=["-B", "server.py"], env=env)
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 result = await session.initialize()
                 self.assertEqual(result.serverInfo.name, "FormKiQ OpenAPI Proxy")
-                self.assertEqual(len((await session.list_tools()).tools), 7)
+                tools = (await session.list_tools()).tools
+                self.assertEqual(len(tools), 29)
+                schema_tool = next(tool for tool in tools if tool.name == "get_sites_schema")
+                self.assertEqual(schema_tool.inputSchema["required"], ["siteId"])
                 resource = await session.read_resource("openapi://formkiq/jwt")
                 self.assertIn("openapi: 3.0", resource.contents[0].text)
                 self.assertFalse(

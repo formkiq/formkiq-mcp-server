@@ -17,6 +17,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .openapi import ALLOWED_OPERATION_IDS, OpenApiProxyError
+from .operations import API_GROUPS
 
 
 def loopback(host: str) -> bool:
@@ -47,8 +48,8 @@ def endpoint_url(value: str) -> str:
     return value
 
 
-def boolean_env(name: str) -> bool:
-    value = os.getenv(name, "false").strip().lower()
+def boolean_env(name: str, *, default: bool = False) -> bool:
+    value = os.getenv(name, str(default).lower()).strip().lower()
     if value not in {"true", "false"}:
         raise OpenApiProxyError(f"{name} must be true or false")
     return value == "true"
@@ -117,8 +118,16 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8000
     callers: tuple[CallerPolicy, ...] = ()
+    api_groups: frozenset[str] = frozenset({"core"})
+    modules: frozenset[str] = frozenset()
+    auto_discover: bool = True
 
     def __post_init__(self) -> None:
+        if not self.api_groups <= API_GROUPS:
+            raise OpenApiProxyError("Unknown FORMKIQ_API_GROUPS; choose from " + ", ".join(sorted(API_GROUPS)))
+        object.__setattr__(self, "api_groups", self.api_groups | {"core"})
+        if any(not isinstance(module, str) or not module.strip() for module in self.modules):
+            raise OpenApiProxyError("FORMKIQ_MODULES must contain nonempty module names")
         if self.api_endpoint:
             object.__setattr__(self, "api_endpoint", endpoint_url(self.api_endpoint))
         if self.enable_purge and not self.enable_writes:
@@ -131,6 +140,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> Settings:
         filename = os.getenv("FORMKIQ_MCP_AUTH_FILE", "").strip()
+        api_groups = os.getenv("FORMKIQ_API_GROUPS", "core")
         try:
             return cls(
                 api_endpoint=os.getenv("FORMKIQ_API_ENDPOINT_URL", "").strip()
@@ -138,10 +148,15 @@ class Settings:
                 jwt=os.getenv("FORMKIQ_JWT", "").strip() or None,
                 enable_writes=boolean_env("FORMKIQ_ENABLE_WRITES"),
                 enable_purge=boolean_env("FORMKIQ_ENABLE_PURGE"),
+                auto_discover=boolean_env("FORMKIQ_AUTO_DISCOVER", default=True),
                 max_response_bytes=int(os.getenv("FORMKIQ_MAX_RESPONSE_BYTES", "65536")),
                 host=os.getenv("FORMKIQ_MCP_HOST", "127.0.0.1"),
                 port=int(os.getenv("FORMKIQ_MCP_PORT", "8000")),
                 callers=load_policies(filename) if filename else (),
+                api_groups=frozenset(filter(None, (value.strip() for value in api_groups.split(",")))),
+                modules=frozenset(
+                    filter(None, (value.strip() for value in os.getenv("FORMKIQ_MODULES", "").split(",")))
+                ),
             )
         except ValueError as exc:
             if isinstance(exc, OpenApiProxyError):
