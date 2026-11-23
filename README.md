@@ -19,7 +19,7 @@ Each MCP server release bundles an OpenAPI snapshot for offline startup. Its ups
 
 For release installations, let your MCP client start this server with `pipx` from a GitHub release tag, using `@vMAJOR.MINOR.PATCH`.
 
-These GitHub installation examples use the published MCP server release `v0.2.0`. Version `0.2.1` in `pyproject.toml` is being prepared for publication. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
+These installation examples use MCP server release `v0.2.1`, available on GitHub and PyPI. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
 
 Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
 
@@ -39,7 +39,7 @@ Add this to `~/.codex/config.toml` or to a trusted project's `.codex/config.toml
 ```toml
 [mcp_servers.formkiq]
 command = "pipx"
-args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0", "formkiq-mcp-server"]
+args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1", "formkiq-mcp-server"]
 env = { "MCP_TRANSPORT" = "stdio", "FORMKIQ_API_ENDPOINT_URL" = "https://abc123.execute-api.us-east-1.amazonaws.com", "FORMKIQ_JWT" = "eyJ..." }
 startup_timeout_sec = 30
 tool_timeout_sec = 60
@@ -61,7 +61,7 @@ claude mcp add --transport stdio formkiq \
   --env FORMKIQ_API_ENDPOINT_URL=https://abc123.execute-api.us-east-1.amazonaws.com \
   --env FORMKIQ_JWT=eyJ... \
   --env MCP_TRANSPORT=stdio \
-  -- pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
+  -- pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
 ```
 
 Then check:
@@ -78,7 +78,7 @@ Inside Claude Code, use:
 
 ## PyPI and the official MCP Registry
 
-Release `0.2.1` is prepared for PyPI and the official MCP Registry. The PyPI commands below apply after that release has been published; until then, use the GitHub installation above.
+Release `0.2.1` is available on [PyPI](https://pypi.org/project/formkiq-mcp-server/0.2.1/) and in the [official MCP Registry](https://registry.modelcontextprotocol.io/?q=formkiq). It is also listed in the [Glama MCP directory](https://glama.ai/mcp/servers/formkiq/formkiq-mcp-server).
 
 ```bash
 uvx --from formkiq-mcp-server==0.2.1 formkiq-mcp-server
@@ -94,7 +94,7 @@ After PyPI confirms the version is available, publish `server.json` using an ide
 
 For a manual retry from an authorized environment, run `mcp-publisher publish` from the directory containing `server.json`. Prefer OIDC in the reviewed release workflow over creating a long-lived token.
 
-The manifest is preparation for publication; a GitHub release alone does not create a PyPI package or an official-registry listing. Verify both listings after publishing.
+The release workflow publishes the PyPI package and then its official-registry entry. Verify both listings after each publication. `glama.json` identifies the GitHub maintainers who can manage the Glama listing after connecting their GitHub accounts.
 
 ## Requirements
 
@@ -153,10 +153,10 @@ cd formkiq-mcp-server
 uv sync --locked
 ```
 
-You can also run release `v0.2.0` directly from GitHub with `pipx`:
+You can also run release `v0.2.1` directly from GitHub with `pipx`:
 
 ```bash
-pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
 ```
 
 ## Configure
@@ -281,7 +281,7 @@ uv run --locked python server.py
 Or, after installing/running through `pipx`:
 
 ```bash
-pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
 ```
 
 By default, the Python MCP SDK serves Streamable HTTP at:
