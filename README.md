@@ -19,7 +19,7 @@ Each MCP server release bundles an OpenAPI snapshot for offline startup. Its ups
 
 For release installations, let your MCP client start this server with `pipx` from a GitHub release tag, using `@vMAJOR.MINOR.PATCH`.
 
-These instructions use MCP server release `v0.2.1`, matching `pyproject.toml`. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
+These GitHub installation examples use the published MCP server release `v0.2.0`. Version `0.2.1` in `pyproject.toml` is being prepared for publication. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
 
 Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
 
@@ -39,7 +39,7 @@ Add this to `~/.codex/config.toml` or to a trusted project's `.codex/config.toml
 ```toml
 [mcp_servers.formkiq]
 command = "pipx"
-args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1", "formkiq-mcp-server"]
+args = ["run", "--spec", "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0", "formkiq-mcp-server"]
 env = { "MCP_TRANSPORT" = "stdio", "FORMKIQ_API_ENDPOINT_URL" = "https://abc123.execute-api.us-east-1.amazonaws.com", "FORMKIQ_JWT" = "eyJ..." }
 startup_timeout_sec = 30
 tool_timeout_sec = 60
@@ -61,7 +61,7 @@ claude mcp add --transport stdio formkiq \
   --env FORMKIQ_API_ENDPOINT_URL=https://abc123.execute-api.us-east-1.amazonaws.com \
   --env FORMKIQ_JWT=eyJ... \
   --env MCP_TRANSPORT=stdio \
-  -- pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
+  -- pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
 ```
 
 Then check:
@@ -88,14 +88,11 @@ For a client that starts the server over stdio, use command `uvx`, arguments `["
 
 `server.json` contains the official-registry metadata and marks the access token as a secret configuration value. Its name must match the `mcp-name` marker in the PyPI README. Do not add real endpoints, JWTs, caller tokens, or customer data to the manifest.
 
-The `Publish Python package` workflow publishes only from the immutable tag matching the package and registry versions. Before the first publication, a PyPI owner must configure a trusted publisher for project `formkiq-mcp-server`, GitHub owner `formkiq`, repository `formkiq-mcp-server`, workflow `publish.yml`, and environment `pypi`. This publisher setup grants package-upload authority to that workflow and requires the account owner's approval. Publish the matching GitHub release only after CI passes.
+The `Publish Python package` workflow publishes only from the tag matching the package and registry versions. Before the first publication, a PyPI owner must configure a trusted publisher for project `formkiq-mcp-server`, GitHub owner `formkiq`, repository `formkiq-mcp-server`, workflow `publish.yml`, and environment `pypi`. This publisher setup grants package-upload authority to that workflow and requires the account owner's approval. Publish the matching GitHub release only after CI passes.
 
-After PyPI confirms the version is available, authenticate with the official MCP Registry using an identity authorized for `io.github.formkiq/`, then run:
+After PyPI confirms the version is available, publish `server.json` using an identity authorized for `io.github.formkiq/`. Organization namespaces currently require GitHub Actions OIDC (`mcp-publisher login github-oidc`) or an organization Owner's token with organization-membership read access. Interactive device login cannot currently verify organization ownership. Follow the official [authentication guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/authentication.mdx) and [GitHub Actions publishing guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx); the Python-package workflow does not publish the registry entry.
 
-```bash
-mcp-publisher validate
-mcp-publisher publish
-```
+Once authenticated, run `mcp-publisher publish` from the directory containing `server.json`. Prefer OIDC in a reviewed release workflow over creating a long-lived token.
 
 The manifest is preparation for publication; a GitHub release alone does not create a PyPI package or an official-registry listing. Verify both listings after publishing.
 
@@ -156,10 +153,10 @@ cd formkiq-mcp-server
 uv sync --locked
 ```
 
-You can also run release `v0.2.1` directly from GitHub with `pipx`:
+You can also run release `v0.2.0` directly from GitHub with `pipx`:
 
 ```bash
-pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
 ```
 
 ## Configure
@@ -284,7 +281,7 @@ uv run --locked python server.py
 Or, after installing/running through `pipx`:
 
 ```bash
-pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.1" formkiq-mcp-server
+pipx run --spec "git+https://github.com/formkiq/formkiq-mcp-server.git@v0.2.0" formkiq-mcp-server
 ```
 
 By default, the Python MCP SDK serves Streamable HTTP at:
