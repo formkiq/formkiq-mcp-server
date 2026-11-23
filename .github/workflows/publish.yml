@@ -1,0 +1,68 @@
+name: Publish Python package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.repository == 'formkiq/formkiq-mcp-server'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.8"
+          python-version: "3.11"
+          enable-cache: true
+      - name: Check immutable release tag and registry metadata
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tomllib
+          from pathlib import Path
+
+          project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+          server = json.loads(Path("server.json").read_text())
+          version = project["version"]
+          if os.environ["RELEASE_REF"] != f"refs/tags/v{version}":
+              raise SystemExit("Run publication only from the matching immutable release tag.")
+          if server["version"] != version or server["packages"][0]["version"] != version:
+              raise SystemExit("Package and registry versions must match.")
+          marker = f"<!-- mcp-name: {server['name']} -->"
+          if marker not in Path("README.md").read_text():
+              raise SystemExit("Missing official-registry ownership marker.")
+          PY
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked python -m unittest discover -v
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/formkiq-mcp-server/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - name: Publish through PyPI trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
