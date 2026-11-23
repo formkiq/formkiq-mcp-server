@@ -1,0 +1,40 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.formkiq/formkiq-mcp-server",
+  "title": "FormKiQ Document MCP Server",
+  "description": "Authenticated document search and retrieval for FormKiQ, read-only by default.",
+  "websiteUrl": "https://docs.formkiq.com/docs/sdks/mcp-server",
+  "repository": {
+    "url": "https://github.com/formkiq/formkiq-mcp-server",
+    "source": "github"
+  },
+  "version": "0.2.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "formkiq-mcp-server",
+      "version": "0.2.1",
+      "runtimeHint": "uvx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MCP_TRANSPORT",
+          "value": "stdio"
+        },
+        {
+          "name": "FORMKIQ_API_ENDPOINT_URL",
+          "description": "HTTPS HttpApiUrl from your FormKiQ deployment's CloudFormation outputs.",
+          "format": "string",
+          "isRequired": true
+        },
+        {
+          "name": "FORMKIQ_JWT",
+          "description": "Current raw Cognito AccessToken with the intended FormKiQ site permissions.",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
