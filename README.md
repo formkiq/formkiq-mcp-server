@@ -1,5 +1,7 @@
 # FormKiQ MCP Server
 
+<!-- mcp-name: io.github.formkiq/formkiq-mcp-server -->
+
 MCP server for FormKiQ, exposing the FormKiQ OpenAPI spec and selected FormKiQ API operations as Model Context Protocol tools.
 
 This server:
@@ -17,7 +19,7 @@ Each MCP server release bundles an OpenAPI snapshot for offline startup. Its ups
 
 For release installations, let your MCP client start this server with `pipx` from a GitHub release tag, using `@vMAJOR.MINOR.PATCH`.
 
-These instructions use MCP server release `v0.2.0`, matching `pyproject.toml`. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
+These GitHub installation examples use the published MCP server release `v0.2.0`. Version `0.2.1` in `pyproject.toml` is being prepared for publication. For local development, use the checkout-based [Install](#install) and [Local Codex Development Setup](#local-codex-development-setup) instructions. Published releases are listed in [Releases](https://github.com/formkiq/formkiq-mcp-server/releases).
 
 Use the FormKiQ CloudFormation `HttpApiUrl` output for JWT/Cognito authentication:
 
@@ -73,6 +75,26 @@ Inside Claude Code, use:
 ```text
 /mcp
 ```
+
+## PyPI and the official MCP Registry
+
+Release `0.2.1` is prepared for PyPI and the official MCP Registry. The PyPI commands below apply after that release has been published; until then, use the GitHub installation above.
+
+```bash
+uvx --from formkiq-mcp-server==0.2.1 formkiq-mcp-server
+```
+
+For a client that starts the server over stdio, use command `uvx`, arguments `["--from", "formkiq-mcp-server==0.2.1", "formkiq-mcp-server"]`, and the same environment configuration shown above. Keep `MCP_TRANSPORT=stdio`, provide your deployment's HTTPS JWT endpoint and a current access token, and begin with the default read-only access. This package does not provision a shared public MCP endpoint.
+
+`server.json` contains the official-registry metadata and marks the access token as a secret configuration value. Its name must match the `mcp-name` marker in the PyPI README. Do not add real endpoints, JWTs, caller tokens, or customer data to the manifest.
+
+The `Publish Python package and MCP Registry` workflow publishes only from the tag matching the package and registry versions. Before the first publication, a PyPI owner must configure a trusted publisher for project `formkiq-mcp-server`, GitHub owner `formkiq`, repository `formkiq-mcp-server`, workflow `publish.yml`, and environment `pypi`. This publisher setup grants package-upload authority to that workflow and requires the account owner's approval. Publish the matching GitHub release only after CI passes.
+
+After PyPI confirms the version is available, publish `server.json` using an identity authorized for `io.github.formkiq/`. Organization namespaces currently require GitHub Actions OIDC (`mcp-publisher login github-oidc`) or an organization Owner's token with organization-membership read access. Interactive device login cannot currently verify organization ownership. Follow the official [authentication guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/authentication.mdx) and [GitHub Actions publishing guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx); the release workflow uses the supported OIDC route after PyPI publication. Its registry job runs in the `mcp-registry` environment, verifies the pinned publisher with Sigstore, and checks that the PyPI README contains the ownership marker before publishing. Configure any required environment approval rules before releasing.
+
+For a manual retry from an authorized environment, run `mcp-publisher publish` from the directory containing `server.json`. Prefer OIDC in the reviewed release workflow over creating a long-lived token.
+
+The manifest is preparation for publication; a GitHub release alone does not create a PyPI package or an official-registry listing. Verify both listings after publishing.
 
 ## Requirements
 

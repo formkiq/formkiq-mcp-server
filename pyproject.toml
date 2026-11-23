@@ -1,7 +1,12 @@
 [project]
 name = "formkiq-mcp-server"
-version = "0.2.0"
+version = "0.2.1"
 description = "MCP server that exposes the FormKiQ OpenAPI spec and proxies selected FormKiQ API operations."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "FormKiQ" }]
+keywords = ["mcp", "formkiq", "document-management", "aws", "document-search"]
 requires-python = ">=3.11"
 dependencies = [
     "anyio>=4.14.2,<5",
@@ -18,6 +23,12 @@ dependencies = [
 
 [dependency-groups]
 dev = ["ruff==0.17.5"]
+
+[project.urls]
+Homepage = "https://formkiq.com/"
+Documentation = "https://docs.formkiq.com/docs/sdks/mcp-server"
+Repository = "https://github.com/formkiq/formkiq-mcp-server"
+Issues = "https://github.com/formkiq/formkiq-mcp-server/issues"
 
 [project.scripts]
 formkiq-mcp-server = "formkiq_mcp.server:main"
